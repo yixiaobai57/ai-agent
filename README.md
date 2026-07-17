@@ -60,8 +60,7 @@ ai-agent/
 │   └── workflow_runner.py   # 工作流执行器
 ├── workflows/
 │   ├── engine.py            # 工作流引擎
-│   └── defs/                # 工作流定义（YAML）
-│       └── daily_report.yaml
+│   └── daily_report.yaml    # 工作流定义（YAML）
 ├── frontend/
 │   └── index.html           # 前端单页应用
 ├── requirements.txt

@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Dict, Optional
 from skills.registry import registry
 
-DEFS_DIR = Path(__file__).parent / 'defs'
+DEFS_DIR = Path(__file__).parent
 
 class WorkflowEngine:
     def __init__(self):
