@@ -1,7 +1,10 @@
 ﻿import json
+from pathlib import Path
 from typing import Dict
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from config import config
 from agent.core import Agent
@@ -12,6 +15,11 @@ app = FastAPI(title='AI Agent Backend', version='2.0.0')
 app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
 registry.discover()
 sessions: Dict[str, Agent] = {}
+
+# 前端构建产物（生产环境单端口部署）
+FRONTEND_DIST = Path(__file__).parent / 'frontend' / 'dist'
+if FRONTEND_DIST.exists():
+    app.mount('/assets', StaticFiles(directory=FRONTEND_DIST / 'assets'), name='assets')
 
 def get_agent(sid='default'):
     if sid not in sessions:
@@ -76,6 +84,14 @@ async def chat(req: ChatReq):
     resp = await agent.run(req.message)
     return {'response': resp}
 
+@app.get('/')
+async def index():
+    # 生产环境返回前端构建产物；开发环境前端独立运行在 5173
+    idx = FRONTEND_DIST / 'index.html'
+    if idx.exists():
+        return FileResponse(idx)
+    return {'name': 'AI Agent Backend', 'version': '2.0.0', 'docs': '/docs', 'frontend': 'run `cd frontend && npm run dev`'}
+
 @app.websocket('/ws/chat')
 async def ws_chat(ws: WebSocket):
     await ws.accept()
@@ -113,5 +129,9 @@ if __name__ == '__main__':
     print(f'  Skills:    {len(registry.get_all())}')
     print(f'  Workflows: {len(workflow_engine.list_workflows())}')
     print(f'  Docs:      http://localhost:{config.PORT}/docs')
+    if FRONTEND_DIST.exists():
+        print(f'  Frontend:  http://localhost:{config.PORT}/  (built)')
+    else:
+        print(f'  Frontend:  http://localhost:5173/  (dev: cd frontend && npm run dev)')
     print('=' * 50)
     uvicorn.run('main:app', host=config.HOST, port=config.PORT, reload=True)

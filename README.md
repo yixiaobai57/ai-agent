@@ -23,8 +23,11 @@
 | **会话记忆** | 自动维护上下文，长对话自动摘要，避免 token 溢出 |
 | **插件式扩展** | 写好一个 Skill 文件丢进 `skills/` 目录即可自动注册新能力，无需改动核心代码 |
 | **深色模式** | 自带暗色主题，并完成移动端响应式适配 |
+| **工程化前端** | React + Vite + Tailwind CSS，组件化拆分，开发模式热更新，构建产物可由后端单端口托管 |
 
 ## 快速开始
+
+### 后端
 
 ```bash
 # 1. 安装依赖
@@ -34,13 +37,23 @@ pip install -r requirements.txt
 cp .env.example .env
 #   编辑 .env，填入你要使用的模型的 API Key
 
-# 3. 启动服务
+# 3. 启动后端
 python main.py
 ```
 
-启动后，浏览器打开 [frontend/index.html](frontend/index.html) 即可使用。
+### 前端
 
-> `.env.example` 里每个模型都留了配置位，用哪个填哪个，不用的留空即可。默认使用 DeepSeek，无需额外配置 Base URL。
+```bash
+cd frontend
+npm install
+npm run dev      # 开发模式，访问 http://localhost:5173
+# 或
+npm run build    # 构建到 frontend/dist，后端会自动托管在 :8000
+```
+
+> 开发模式下前端运行在 5173，通过 Vite 代理转发 `/api` 和 `/ws` 到后端 8000。
+> 生产构建后，直接访问 `http://localhost:8000` 即可单端口使用。
+> `.env.example` 里每个模型都留了配置位，用哪个填哪个，不用的留空即可。
 
 ## 项目结构
 
@@ -61,8 +74,26 @@ ai-agent/
 ├── workflows/
 │   ├── engine.py            # 工作流引擎
 │   └── daily_report.yaml    # 工作流定义（YAML）
-├── frontend/
-│   └── index.html           # 前端单页应用
+├── frontend/                # React + Vite + Tailwind 前端
+│   ├── src/
+│   │   ├── App.jsx          # 应用入口，组合各组件
+│   │   ├── components/      # UI 组件
+│   │   │   ├── Sidebar.jsx
+│   │   │   ├── TopBar.jsx
+│   │   │   ├── ChatWindow.jsx
+│   │   │   ├── MessageBubble.jsx
+│   │   │   ├── Composer.jsx
+│   │   │   ├── ToolCall.jsx
+│   │   │   └── Modal.jsx
+│   │   ├── hooks/           # 自定义 hooks
+│   │   │   ├── useAppStore.js   # 全局状态（会话/主题/配置）
+│   │   │   └── useWebSocket.js  # WebSocket 连接与事件
+│   │   ├── constants.js
+│   │   ├── utils.js
+│   │   └── index.css        # Tailwind + 主题变量
+│   ├── index.html
+│   ├── vite.config.js       # 含 dev proxy
+│   └── package.json
 ├── requirements.txt
 └── .env.example
 ```
@@ -133,7 +164,6 @@ steps:
 
 ## 已知不足
 
-- 前端为原生 HTML，未引入框架，后续维护存在一定成本
 - 工具调用的错误处理较粗，模型返回异常格式时会直接报错
 - 技能暂不支持热加载，新增技能需重启服务
 - 会话状态保存在内存中，重启即丢失
