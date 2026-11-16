@@ -17,6 +17,8 @@
 - **代码执行隔离**：黑名单 → AST 白名单 + 危险调用拦截（`eval/exec/compile/__import__/getattr-dunder`），
   从宿主 `exec` 改为 `python -I` 子进程 + 独立临时工作目录 + 超时 kill，不再污染全局 `sys.stdout`。
 - 请求体超限返回 `413 payload_too_large`；`GET /api/config` 只回 `has_api_key`，绝不回显密钥。
+- **构建产物不含密钥**：`.dockerignore` 排除 `.env` / `.env.*`（此前 `COPY . .` 会把本地密钥打进镜像层）。
+- **`docker compose up` 不再硬依赖 `.env`**：改为 `${VAR:-默认}` 插值透传，缺省的 Key 自动进入 Mock 模式。
 
 ### 修复（Fixed）
 
@@ -28,6 +30,8 @@
   被当成假值，静默改用全局注册表；改为 `is not None`。
 - **工具失败不可纠错**：工具异常不再穿透到 HTTP 层，统一转成 `ERROR[<code>]: ...` 回喂模型。
 - **超时后线程继续跑**：v2 的 `wait_for` 超时后目标仍在执行；v3 超时直接 kill 子进程。
+- **测试跨平台化**：`test_absolute_path_is_blocked` 原先用 `SYSTEMROOT`/`C:/Windows` 构造越界路径，
+  在 Linux 上退化成相对路径、断言从 `path_escape` 变成 `not_found`；改为在临时目录里新建真实兄弟目录。
 
 ### 新增（Added）
 
@@ -54,9 +58,12 @@
 
 ### 测试
 
-- 92 个测试通过、1 个跳过（Windows 无软链接权限）；总覆盖率 87%。
+- 105 个测试通过、1 个跳过（Windows 无软链接权限）；总覆盖率 89%。
+  `skills/search_web.py`（Mock 降级 / 条数收敛 / 超时·HTTP·网络三类错误）与
+  `skills/workflow_runner.py`（成功 / 步骤失败 / 结构化错误 / 工作流清单）补到 100%。
 - `ruff check .` 全绿；`mypy` 在 22 个源文件上无报错。
 - `scripts/e2e_smoke.py`：HTTP / SSE / WS / 参数校验拒绝 全部通过（Mock 模式，零密钥）。
+- GitHub Actions 四条 job（backend 3.11 & 3.12 / frontend / docker 构建 + 容器冒烟）全部通过。
 
 ## [2.0.0]
 
