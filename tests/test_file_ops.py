@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -58,8 +57,10 @@ async def test_escape_via_sibling_with_same_prefix_is_blocked(base: Path, tmp_pa
     assert is_within(sibling.resolve(), base.resolve()) is False
 
 
-async def test_absolute_path_is_blocked(skill: FileOpsSkill) -> None:
-    outside = Path(os.environ.get("SYSTEMROOT", "C:/")) / "Windows"
+async def test_absolute_path_is_blocked(skill: FileOpsSkill, tmp_path: Path) -> None:
+    # 用真实存在、且在 base 之外的绝对路径，避免依赖 Windows 专有的 SYSTEMROOT
+    outside = tmp_path / "outside_abs"
+    outside.mkdir()
     result = await skill(action="list", path=str(outside))
     assert not result.success
     assert result.metadata["error_code"] == "path_escape"
