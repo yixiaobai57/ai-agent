@@ -2,8 +2,8 @@
 
 ![CI](https://github.com/yixiaobai57/ai-agent/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-3776AB)
-![tests](https://img.shields.io/badge/tests-92%20passed-2ea44f)
-![coverage](https://img.shields.io/badge/coverage-87%25-2ea44f)
+![tests](https://img.shields.io/badge/tests-105%20passed-2ea44f)
+![coverage](https://img.shields.io/badge/coverage-89%25-2ea44f)
 ![lint](https://img.shields.io/badge/ruff%20%2B%20mypy-clean-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -81,7 +81,7 @@ thinking → token* → tool_call → tool_result → token* → answer(trace)
 | 5 | README 写「打字机效果」，实际只在结尾推一次整段 `answer` | 文档与实现不符 | 真 token 增量：`Delta` → `token` 事件，前端流式拼装 |
 | 6 | 单例 Agent + 覆盖 `on_stream` 回调 | 两个标签页同时对话互相抢回调 | 回调按调用传入 `run(..., on_event=cb)` |
 | 7 | 会话存进程内 dict，无上限无过期 | 重启即丢；长跑必涨内存 | `SessionStore` + SQLite upsert + LRU/TTL 淘汰 |
-| 8 | 无测试、无 lint、无类型检查、无 CI | 改动靠手点，回归靠运气 | 92 个测试 / ruff / mypy / GitHub Actions |
+| 8 | 无测试、无 lint、无类型检查、无 CI | 改动靠手点，回归靠运气 | 105 个测试 / ruff / mypy / GitHub Actions |
 | 9 | `WorkflowEngine(skill_registry or registry)` | 空 registry 因 `__len__==0` 被当假值，静默用全局注册表 | 改 `is not None`（这个 bug 就是被 `test_missing_skill_is_structured` 抓出来的） |
 
 ## 安全边界（可复现）
@@ -126,7 +126,7 @@ docker compose up --build # http://localhost:8000
 ```
 
 > 镜像为两阶段构建（node 编前端 → python 跑后端），以非 root 用户运行，自带 `HEALTHCHECK`。
-> 本机未安装 Docker，镜像构建由 CI 的 `docker` job 首次验证；`docker-compose.yml` 已按同构方式编写。
+> 镜像构建与容器冒烟（`MOCK_LLM=true` 下打 `/health` 与 `/api/chat`）已在 CI 的 `docker` job 中实际跑通。
 
 ### 接入真实模型
 
@@ -179,8 +179,8 @@ class WeatherSkill(BaseSkill):
 
 | 项目 | 命令 | 当前结果 |
 |---|---|---|
-| 单元 / 集成测试 | `python -m pytest` | **92 passed, 1 skipped**（skip = Windows 无软链接权限的 symlink 用例） |
-| 覆盖率 | `python -m pytest --cov=. --cov-report=term` | **87%**（`agent/core.py` 93%、`skills/code_executor.py` 97%） |
+| 单元 / 集成测试 | `python -m pytest` | **105 passed, 1 skipped**（skip = Windows 无软链接权限的 symlink 用例） |
+| 覆盖率 | `python -m pytest --cov=. --cov-report=term` | **89%**（`agent/core.py` 93%、`skills/code_executor.py` 97%、`skills/search_web.py` 与 `workflow_runner.py` 100%） |
 | 静态检查 | `python -m ruff check .` | **All checks passed** |
 | 类型检查 | `python -m mypy` | **Success: no issues found in 22 source files** |
 | 前端构建 / Lint | `cd frontend && npm run build && npm run lint` | 构建成功；oxlint **0 warnings / 0 errors** |
@@ -208,7 +208,7 @@ ai-agent/
 ├── skills/                  # 可插拔技能：base / registry / file_ops / code_executor / search_web / workflow_runner
 ├── workflows/               # YAML 编排引擎 + daily_report.yaml 示例
 ├── sessions/                # 会话存储：内存 LRU/TTL、SQLite、工厂函数
-├── tests/                   # 92 个测试（含 Fake LLM 脚本驱动的确定性 Agent 测试）
+├── tests/                   # 105 个测试（含 Fake LLM 脚本驱动的确定性 Agent 测试）
 ├── scripts/e2e_smoke.py     # 零密钥端到端冒烟
 ├── frontend/                # React 19 + Vite + Tailwind，token 级流式渲染
 ├── docs/                    # ARCHITECTURE.md / TOOL_PROTOCOL.md
