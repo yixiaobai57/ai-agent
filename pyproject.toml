@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-agent"
+version = "3.0.0"
+description = "可插拔的多模型 AI Agent：流式输出、工具调用、工作流编排"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi==0.115.0",
+    "uvicorn[standard]==0.30.0",
+    "openai==1.50.0",
+    "pydantic==2.9.0",
+    "pydantic-settings==2.5.2",
+    "pyyaml==6.0.2",
+    "httpx==0.27.0",
+]
+
+[tool.setuptools]
+py-modules = ["config", "main"]
+packages = ["agent", "api", "sessions", "skills", "workflows"]
+
+# --------------------------------------------------------------------------- #
+# pytest
+# --------------------------------------------------------------------------- #
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-q --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+# --------------------------------------------------------------------------- #
+# ruff
+# --------------------------------------------------------------------------- #
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+src = ["."]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "C4", "RET", "ASYNC"]
+ignore = [
+    "E501",   # 行宽由 line-length 处理，中文注释不强制断行
+    "B008",   # FastAPI 依赖用函数调用做默认值是标准写法
+    "RET504", # 允许 return 前多一步赋值，可读性更好
+    "SIM108", # 三元表达式不是永远更好读
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011", "SIM117"]
+
+# --------------------------------------------------------------------------- #
+# mypy
+# --------------------------------------------------------------------------- #
+[tool.mypy]
+python_version = "3.10"
+files = ["config.py", "main.py", "agent", "api", "sessions", "skills", "workflows"]
+check_untyped_defs = true
+warn_unused_ignores = false
+warn_redundant_casts = true
+no_implicit_optional = true
+ignore_missing_imports = true
+show_error_codes = true
+exclude = ["tests/"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+ignore_errors = true
+
+# --------------------------------------------------------------------------- #
+# coverage
+# --------------------------------------------------------------------------- #
+[tool.coverage.run]
+source = ["agent", "api", "sessions", "skills", "workflows"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

@@ -1,7 +1,6 @@
 // 顶部栏：状态、模型、设置、主题
 export default function TopBar({ status, model, onToggleSidebar, onOpenModel, onOpenSetting, onToggleTheme, theme }) {
   const statusLabel = { ok: '已连接', wait: '连接中…', off: '离线' }[status] || status
-  const statusText = { ok: '●', wait: '●', off: '●' }
 
   return (
     <header className="top flex items-center justify-between px-5 py-2.5 border-b border-bdr bg-bg flex-shrink-0 gap-3">
