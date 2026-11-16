@@ -1,0 +1,43 @@
+# Render Blueprint：一条命令把 Mock 模式 demo 部署成公开实例
+#
+# 用法（两种都行）：
+#   1) Render 控制台 → New → Blueprint → 选本仓库，自动读取这个文件
+#   2) 用 API：POST /v1/blueprints（或直接 POST /v1/services 指定 dockerfilePath）
+#
+# 设计取舍：
+#   · MOCK_LLM=true   不填任何模型 Key，零成本、可离线复现，面试官点开就能试
+#   · MOCK_LATENCY=0.03  每 chunk 停 30ms，前端能看到真正的打字机效果
+#   · SESSION_BACKEND=memory  托管平台文件系统是临时的，SQLite 每次重启即失效，
+#                             内存存储 + LRU 上限反而更稳（会话本来就只活一次演示）
+#   · ENABLE_CODE_EXEC=true 保留（这是 demo 的亮点），但把超时压死，
+#     陌生人提交的代码最多跑 5 秒就被 kill
+services:
+  - type: web
+    name: ai-agent-demo
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: MOCK_LLM
+        value: "true"
+      - key: MOCK_LATENCY
+        value: "0.03"
+      - key: SESSION_BACKEND
+        value: memory
+      - key: MAX_SESSIONS
+        value: "200"
+      - key: SESSION_TTL
+        value: "1800"
+      - key: ENABLE_CODE_EXEC
+        value: "true"
+      - key: CODE_EXEC_TIMEOUT
+        value: "5"
+      - key: TOOL_TIMEOUT
+        value: "15"
+      - key: ALLOW_RUNTIME_CONFIG
+        value: "false"
+      - key: LOG_LEVEL
+        value: "WARNING"
