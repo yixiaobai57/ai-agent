@@ -54,6 +54,14 @@ function ModelForm({ config, onClose, onSave }) {
     <>
       <h3 className="text-base font-semibold mb-1">切换模型</h3>
       <p className="text-[13px] text-fg3 mb-[18px] leading-6">选择预设或自定义，保存后自动重连。</p>
+      {config.allow_runtime_config === false && (
+        <p className="text-[12px] text-err mb-4 leading-5 px-3 py-2 rounded-rs border border-bdr2 bg-bg2">
+          运行期改配置已关闭（安全默认，防止 base_url 被改成第三方地址导致 API Key 外泄）。
+          请修改 <span className="font-mono">.env</span> 后重启，或在服务端设置
+          <span className="font-mono"> ALLOW_RUNTIME_CONFIG=true</span> 与
+          <span className="font-mono"> ADMIN_TOKEN</span>。
+        </p>
+      )}
       <div className="ml flex flex-col gap-1 mb-[18px]">
         {MODEL_PRESETS.map((p) => {
           const active = model === p.m
@@ -106,7 +114,7 @@ function ModelForm({ config, onClose, onSave }) {
         <button className="btn btn-g" onClick={onClose}>
           取消
         </button>
-        <button className="btn btn-a" onClick={save}>
+        <button className="btn btn-a" onClick={save} disabled={config.allow_runtime_config === false}>
           保存
         </button>
       </div>

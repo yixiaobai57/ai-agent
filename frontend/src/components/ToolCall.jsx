@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { SKILL_ICONS } from '../constants'
 
-// 工具调用行 + 结果展开
-export default function ToolCall({ name, args, status, result }) {
+// 工具调用行 + 结果展开（新增：失败态与耗时，便于面试/排障时看清每一步）
+export default function ToolCall({ name, args, status, result, duration }) {
   const [expanded, setExpanded] = useState(false)
   let argStr = ''
   try {
@@ -11,17 +11,23 @@ export default function ToolCall({ name, args, status, result }) {
     argStr = String(args)
   }
   const argPreview = argStr.length > 120 ? argStr.slice(0, 120) + '…' : argStr
+  const failed = status === 'error' || status === 'timeout'
 
   return (
-    <div className="anim-tIn flex items-center gap-2 px-3 py-2 rounded-rs bg-bg2 border border-bdr2 my-1.5 text-xs">
+    <div className="anim-tIn flex flex-wrap items-center gap-2 px-3 py-2 rounded-rs bg-bg2 border border-bdr2 my-1.5 text-xs">
       <span className="text-[13px] flex-shrink-0">{SKILL_ICONS[name] || '🔧'}</span>
       <span className="font-semibold text-fg2">{name}</span>
       <span className="text-fg4 text-[11px]">{argPreview.replace(/</g, '&lt;')}</span>
+      {typeof duration === 'number' && <span className="text-[10px] text-fg4">{duration}ms</span>}
       <span
-        className={`ml-auto flex items-center gap-1 text-[11px] transition-colors ${status === 'ok' ? 'text-ok' : 'text-fg4'}`}
+        className={`ml-auto flex items-center gap-1 text-[11px] transition-colors ${
+          status === 'ok' ? 'text-ok' : failed ? 'text-err' : 'text-fg4'
+        }`}
       >
         {status === 'ok' ? (
           '✓'
+        ) : failed ? (
+          status === 'timeout' ? '超时' : '失败'
         ) : (
           <>
             <span className="anim-spin inline-block w-2 h-2 border-2 border-bdr border-t-ac rounded-full" />
@@ -29,8 +35,11 @@ export default function ToolCall({ name, args, status, result }) {
         )}
       </span>
       {result && (
-        <div className="w-full mt-1 ml-0 p-2 bg-card border border-bdr rounded-rx text-[11px] text-fg3 font-mono leading-[1.5] anim-exIn max-h-20 overflow-auto whitespace-pre-wrap break-words">
-          {result.length > 200 ? result.slice(0, 200) + '…' : result}
+        <div
+          className="w-full mt-1 ml-0 p-2 bg-card border border-bdr rounded-rx text-[11px] text-fg3 font-mono leading-[1.5] anim-exIn max-h-20 overflow-auto whitespace-pre-wrap break-words cursor-pointer"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded || String(result).length <= 200 ? String(result) : String(result).slice(0, 200) + '…'}
         </div>
       )}
     </div>

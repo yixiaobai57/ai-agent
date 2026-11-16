@@ -1,88 +1,101 @@
 import { useCallback, useEffect, useState } from 'react'
+import { marked } from 'marked'
 import Sidebar from './components/Sidebar'
 import ChatWindow from './components/ChatWindow'
 import Composer from './components/Composer'
 import TopBar from './components/TopBar'
 import Modal from './components/Modal'
+import ToolCall from './components/ToolCall'
+import MessageBubble from './components/MessageBubble'
 import { useAppStore } from './hooks/useAppStore'
 import { useWebSocket } from './hooks/useWebSocket'
 import { estimateTokens, formatTime } from './utils'
-import ToolCall from './components/ToolCall'
+
+marked.setOptions({ breaks: true, gfm: true })
+
+// 流式片段：{kind:'text', text} 或 {kind:'tool', name, args, status, result, duration}
+const EMPTY_PARTS = []
 
 export default function App() {
   const store = useAppStore()
-  const [live, setLive] = useState(null) // 流式临时节点
+  const [parts, setParts] = useState(EMPTY_PARTS)
+  const [thinking, setThinking] = useState(false)
   const [busy, setBusy] = useState(false)
   const [modal, setModal] = useState(null) // 'model' | 'setting' | 'prompt'
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [pendingTool, setPendingTool] = useState(null)
 
-  // 处理 WebSocket 事件
+  // 处理 WebSocket 事件（token 级增量拼接，避免整段覆盖）
   const onEvent = useCallback(
     (event, data) => {
       if (event === 'thinking') {
-        setLive(
-          <div className="mg py-4 anim-mIn">
-            <div className="mr text-[11px] font-semibold text-fg4 mb-1.5">Agent</div>
-            <div className="typ flex gap-1 py-1.5">
-              <span className="anim-dp w-1 h-1 rounded-full bg-fg4" />
-              <span className="anim-dp w-1 h-1 rounded-full bg-fg4" style={{ animationDelay: '.2s' }} />
-              <span className="anim-dp w-1 h-1 rounded-full bg-fg4" style={{ animationDelay: '.4s' }} />
-            </div>
-          </div>,
-        )
-      } else if (event === 'tool_call') {
-        setPendingTool({ name: data.name, args: data.args, status: 'running' })
-        setLive(<ToolCall name={data.name} args={data.args} status="running" />)
-      } else if (event === 'tool_result') {
-        setPendingTool((p) => (p ? { ...p, status: 'ok', result: data.data } : null))
-        setLive((prev) => {
-          if (!prev) return null
-          // 简单替换：重新渲染 ToolCall
-          return <ToolCall name={data.name} args={pendingTool?.args} status="ok" result={data.data} />
+        setThinking(true)
+      } else if (event === 'token') {
+        const delta = data?.delta || ''
+        if (!delta) return
+        setThinking(false)
+        setParts((prev) => {
+          const last = prev[prev.length - 1]
+          if (last && last.kind === 'text') {
+            return [...prev.slice(0, -1), { ...last, text: last.text + delta }]
+          }
+          return [...prev, { kind: 'text', text: delta }]
         })
+      } else if (event === 'tool_call') {
+        setThinking(false)
+        setParts((prev) => [
+          ...prev,
+          { kind: 'tool', name: data.name, args: data.args, status: data.status || 'running' },
+        ])
+      } else if (event === 'tool_result') {
+        setParts((prev) => {
+          const idx = [...prev]
+            .reverse()
+            .findIndex((p) => p.kind === 'tool' && p.status === 'running' && p.name === data.name)
+          if (idx === -1) return prev
+          const pos = prev.length - 1 - idx
+          const next = [...prev]
+          next[pos] = { ...next[pos], status: data.status || 'ok', result: data.data, duration: data.duration_ms }
+          return next
+        })
+        setThinking(true)
       } else if (event === 'answer') {
-        setLive(null)
-        setPendingTool(null)
+        setParts(EMPTY_PARTS)
+        setThinking(false)
         store.appendMessage({
           role: 'assistant',
           content: data.content,
           tokens: estimateTokens(data.content),
+          trace: data.trace,
         })
-        done()
+        setBusy(false)
       } else if (event === 'error') {
-        setLive(
-          <div className="mg py-4 anim-mIn">
-            <div className="mr text-[11px] font-semibold text-err mb-1.5">错误</div>
-            <div className="mb text-err">{String(data.message || 'Error')}</div>
-          </div>,
-        )
-        done()
+        setParts((prev) => [
+          ...prev,
+          { kind: 'error', text: `${data.message || 'Error'}${data.code ? `（${data.code}）` : ''}` },
+        ])
+        setThinking(false)
+        setBusy(false)
       }
     },
-    [store, pendingTool],
+    [store],
   )
 
   const ws = useWebSocket(store.apiBase, onEvent)
 
-  const done = useCallback(() => {
-    setBusy(false)
-  }, [])
-
   // 发送消息
   const send = useCallback(
     (text, attachments = []) => {
-      store.ensureSession()
       const content = text || '(附件)'
-      store.appendMessage({
+      const sid = store.appendMessage({
         role: 'user',
         content,
         tokens: estimateTokens(text),
         att: attachments.slice(),
       })
       setBusy(true)
-      setLive(null)
-      ws.send({ message: text, session_id: store.sessionId })
+      setParts(EMPTY_PARTS)
+      setThinking(true)
+      ws.send({ message: text, session_id: sid })
     },
     [store, ws],
   )
@@ -102,12 +115,16 @@ export default function App() {
     a.remove()
   }
 
-  // 模型保存
+  // 模型保存：后端可能因安全默认拒绝（runtime_config_disabled），把原因如实展示
   const saveModel = async (body) => {
     try {
-      await ws.updateConfig(body)
-      setModal(null)
-      store.clearSessions()
+      const d = await ws.updateConfig(body)
+      if (d.status === 'ok') {
+        setModal(null)
+        store.clearSessions()
+        return
+      }
+      alert(d.message || d.error_code || '保存失败')
     } catch (e) {
       alert('失败: ' + e.message)
     }
@@ -130,6 +147,8 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  const live = renderLive(parts, thinking, busy)
 
   return (
     <div className="app grid h-screen overflow-hidden" style={{ gridTemplateColumns: 'var(--sbw,256px) 1fr' }}>
@@ -177,6 +196,64 @@ export default function App() {
         onSaveModel={saveModel}
         onSaveSetting={saveSetting}
       />
+    </div>
+  )
+}
+
+// 把流式片段渲染成 DOM。文本片段交给 MessageBubble（保留 Markdown/代码高亮），
+// 工具片段交给 ToolCall（保留展开与耗时展示）。
+function renderLive(parts, thinking, busy) {
+  if (!parts.length) {
+    if (!thinking && !busy) return null
+    return (
+      <div className="mg py-4 anim-mIn">
+        <div className="mr text-[11px] font-semibold text-fg4 mb-1.5">Agent</div>
+        <div className="typ flex gap-1 py-1.5">
+          <span className="anim-dp w-1 h-1 rounded-full bg-fg4" />
+          <span className="anim-dp w-1 h-1 rounded-full bg-fg4" style={{ animationDelay: '.2s' }} />
+          <span className="anim-dp w-1 h-1 rounded-full bg-fg4" style={{ animationDelay: '.4s' }} />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="anim-mIn">
+      {parts.map((p, i) => {
+        if (p.kind === 'tool') {
+          return (
+            <ToolCall key={`t-${i}`} name={p.name} args={p.args} status={p.status} result={p.result} duration={p.duration} />
+          )
+        }
+        if (p.kind === 'error') {
+          return (
+            <div key={`e-${i}`} className="mg py-4">
+              <div className="mr text-[11px] font-semibold text-err mb-1.5">错误</div>
+              <div className="mb text-err">{p.text}</div>
+            </div>
+          )
+        }
+        return (
+          <MessageBubble
+            key={`m-${i}`}
+            msg={{
+              id: `live-${i}`,
+              role: 'assistant',
+              content: p.text,
+              html: marked.parse(p.text || ''),
+              time: Date.now(),
+              streaming: true,
+            }}
+          />
+        )
+      })}
+      {thinking && (
+        <div className="typ flex gap-1 py-1.5 pl-1">
+          <span className="anim-dp w-1 h-1 rounded-full bg-fg4" />
+          <span className="anim-dp w-1 h-1 rounded-full bg-fg4" style={{ animationDelay: '.2s' }} />
+          <span className="anim-dp w-1 h-1 rounded-full bg-fg4" style={{ animationDelay: '.4s' }} />
+        </div>
+      )}
     </div>
   )
 }

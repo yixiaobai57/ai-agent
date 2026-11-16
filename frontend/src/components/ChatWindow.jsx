@@ -3,14 +3,13 @@ import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
 import MessageBubble from './MessageBubble'
-import ToolCall from './ToolCall'
 import { SUGGESTIONS } from '../constants'
 import { formatDate } from '../utils'
 
 marked.setOptions({ breaks: true, gfm: true })
 
-// 流式事件渲染（thinking / tool_call / tool_result / answer / error）
-export default function ChatWindow({ messages, live, onSuggestion, onSend }) {
+// 消息列表 + 代码高亮/复制；流式片段由 App 组装成 React 元素后通过 live 传入
+export default function ChatWindow({ messages, live, onSend }) {
   const scrollRef = useRef(null)
 
   useEffect(() => {
