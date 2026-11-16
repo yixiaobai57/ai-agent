@@ -5,14 +5,17 @@ services:
     container_name: ai-agent
     ports:
       - "8000:8000"
-    env_file:
-      - .env
     environment:
       # 容器内固定落盘 + 固定目录，宿主机通过 volume 持久化
       SESSION_BACKEND: sqlite
       SESSION_DB_PATH: /app/data/sessions.db
       DATA_DIR: /app/data
       WORKSPACE_DIR: /app/workspace
+      # 模型配置从宿主机环境或 .env 透传，缺省即进入 Mock 模式（零密钥可跑）
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      API_BASE_URL: ${API_BASE_URL:-https://api.deepseek.com/v1}
+      AGENT_MODEL: ${AGENT_MODEL:-deepseek-chat}
+      MOCK_LLM: ${MOCK_LLM:-false}
     volumes:
       - ./data:/app/data
       - ./workspace:/app/workspace
